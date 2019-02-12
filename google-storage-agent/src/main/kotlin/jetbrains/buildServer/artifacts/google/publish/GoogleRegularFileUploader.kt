@@ -46,20 +46,19 @@ class GoogleRegularFileUploader : GoogleFileUploader {
                 LOG.infoAndDebugDetails(message, e)
 
                 if (e is StorageException) {
-                    if (e.isRetryable) {
-                        LOG.info(e.message)
-                        backOffInterval = backOff.nextBackOffMillis()
-                        if (backOffInterval != ExponentialBackOff.STOP) {
-                            build.buildLogger.message("Failed to publish artifact $filePath: ${e.message}. Will retry in ${backOffInterval / 1000} seconds.")
-                            delay(backOffInterval, TimeUnit.MILLISECONDS)
-                            continue
-                        }
+                    if (!e.isRetryable) {
+                        LOG.warn(e.message)
+                        build.buildLogger.error(e.message)
+                        throw ArtifactPublishingFailedException(message, false, e)
                     }
-                    LOG.warn(e.message)
-                    build.buildLogger.error(e.message)
                 }
 
-                throw ArtifactPublishingFailedException(message, false, e)
+                LOG.info(e.message)
+                backOffInterval = backOff.nextBackOffMillis()
+                if (backOffInterval != ExponentialBackOff.STOP) {
+                    build.buildLogger.message("Failed to publish artifact $filePath: ${e.message}. Will retry in ${backOffInterval / 1000} seconds.")
+                    delay(backOffInterval, TimeUnit.MILLISECONDS)
+                }
             }
         } while (backOffInterval != ExponentialBackOff.STOP)
 
